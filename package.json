@@ -14,8 +14,8 @@
     "electron-pack": "npm run build && electron-builder",
     "preelectron-pack": "npm run build",
     "dist": "npm run build && electron-builder --publish=never",
-    "dist-win": "npm run build && electron-builder --win",
-    "dist-mac": "npm run build && electron-builder --mac"
+    "dist-win": "npm run build && electron-builder --win --publish=never",
+    "dist-mac": "npm run build && electron-builder --mac --publish=never"
   },
   "keywords": [
     "electron",
