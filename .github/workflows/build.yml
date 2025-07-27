@@ -1,0 +1,120 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build React app
+      run: npm run build
+      
+    - name: Build Electron app (macOS)
+      if: matrix.os == 'macos-latest'
+      run: npm run dist-mac
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Build Electron app (Windows)
+      if: matrix.os == 'windows-latest'
+      run: npm run dist-win
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Upload macOS artifacts
+      if: matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-installer
+        path: dist/*.dmg
+
+    - name: Upload Windows artifacts
+      if: matrix.os == 'windows-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-installer
+        path: dist/*.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: 学生参与管理器 v${{ github.run_number }}
+        body: |
+          ## 🎉 学生参与管理器新版本发布
+          
+          ### 📦 下载安装包
+          - **macOS**: 下载 `.dmg` 文件
+          - **Windows**: 下载 `.exe` 文件
+          
+          ### ✨ 主要功能
+          - 学生信息管理
+          - 随机选择学生
+          - 参与记录追踪
+          - 统计分析报告
+          - 数据导入导出
+          
+          ### 🚀 安装说明
+          - **macOS**: 双击 `.dmg` 文件，拖拽到应用程序文件夹
+          - **Windows**: 双击 `.exe` 文件按提示安装
+          
+          自动构建时间: ${{ github.event.head_commit.timestamp }}
+        draft: false
+        prerelease: false
+        
+    - name: Upload macOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./macos-installer/学生参与管理器-1.0.0.dmg
+        asset_name: 学生参与管理器-macOS.dmg
+        asset_content_type: application/octet-stream
+        
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./windows-installer/学生参与管理器 Setup 1.0.0.exe
+        asset_name: 学生参与管理器-Windows.exe
+        asset_content_type: application/octet-stream
